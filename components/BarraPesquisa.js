@@ -1,6 +1,6 @@
 import { Image, TextInput, View, StyleSheet } from "react-native";
 
-export default function BarraPesquisa() {
+export default function BarraPesquisa({ busca, setBusca }) {
     return (
         <View style={styles.container}>
             <Image
@@ -11,7 +11,9 @@ export default function BarraPesquisa() {
             <TextInput
                 style={styles.input}
                 placeholder="Buscar livros..."
-                placeholderTextColor="#grey"
+                placeholderTextColor="grey"
+                value={busca}
+                onChangeText={setBusca}
             />
         </View>
     );

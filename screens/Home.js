@@ -1,5 +1,6 @@
-import { View, StyleSheet } from "react-native";
-import { useEffect, useState } from "react";
+import { Pressable, Text, View, StyleSheet } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import {useFocusEffect} from "@react-navigation/native";
 
 import Header from "../components/Header";
 import { buscarLivros } from "../services/Livros/buscarLivros";
@@ -7,11 +8,14 @@ import Destaques from "../components/Destaques";
 import BarraPesquisa from "../components/BarraPesquisa";
 import { buscarCategorias } from "../services/Categorias/buscarCategorias";
 import Categorias from "../components/Categorias";
+import {usuarioEstaLogado} from "../services/Auth/sessao";
 
-export default function Home() {
+export default function Home({navigation}) {
     const [livros, setLivros] = useState([]);
     const [categorias, setCategorias] = useState([]);
     const [categoriaSelecionada, setCategoriaSelecionada] = useState(null);
+    const [busca, setBusca] = useState("");
+    const [logado, setLogado] = useState(usuarioEstaLogado());
 
     useEffect(() => {
         buscarLivros(setLivros);
@@ -21,17 +25,40 @@ export default function Home() {
         buscarCategorias(setCategorias);
     }, []);
 
-    const livrosFiltrados = categoriaSelecionada
-        ? livros.filter(
-            (livro) => livro.categoria === categoriaSelecionada
-        )
-        : livros;
+    useFocusEffect(useCallback(() => {
+        setLogado(usuarioEstaLogado());
+    }, []));
+
+    const textoBusca = busca.trim().toLowerCase();
+
+    const livrosFiltrados = livros.filter((livro) => {
+        const correspondeCategoria = categoriaSelecionada
+            ? livro.categoria === categoriaSelecionada
+            : true;
+
+        const correspondeBusca = textoBusca
+            ? [
+                livro.titulo,
+                livro.autor,
+                livro.categoria,
+                livro.descricao,
+            ].some((campo) => campo.toLowerCase().includes(textoBusca))
+            : true;
+
+        return correspondeCategoria && correspondeBusca;
+    });
 
     return (
         <View style={styles.container}>
             <Header />
 
-            <BarraPesquisa />
+            {logado ? (
+                <Pressable style={styles.botaoAdicionar} onPress={() => navigation.navigate("AdicionarLivro")}>
+                    <Text style={styles.botaoAdicionarTexto}>Adicionar livro</Text>
+                </Pressable>
+            ) : null}
+
+            <BarraPesquisa busca={busca} setBusca={setBusca} />
 
             <Categorias
                 categorias={categorias}
@@ -47,5 +74,21 @@ export default function Home() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+    },
+
+    botaoAdicionar: {
+        height: 44,
+        marginHorizontal: 15,
+        marginTop: 12,
+        borderRadius: 8,
+        backgroundColor: "#ca0909",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+
+    botaoAdicionarTexto: {
+        color: "#fff",
+        fontSize: 15,
+        fontWeight: "bold",
     },
 });
