@@ -1,9 +1,22 @@
 import {salvarToken} from "./sessao";
+import {salvarUsuario} from "../Usuarios/usuarioStorage";
 
 const API_URL = "https://apps-api-livros.ucxocw.easypanel.host/auth/login";
 
 function extrairToken(dados) {
-    return dados.token || dados.accessToken || dados.access_token || dados.jwt || dados.usuario?.token;
+    return dados.token || dados.accessToken || dados.access_token || dados.jwt || dados.usuario?.token || dados.user?.token;
+}
+
+function montarUsuario(dados, credenciais, token) {
+    const usuarioResposta = dados.usuario || dados.user || dados;
+    const {token: _token, accessToken, access_token, jwt, ...informacoesUsuario} = usuarioResposta;
+
+    return {
+        ...informacoesUsuario,
+        email: usuarioResposta.email || credenciais.email,
+        senha: usuarioResposta.senha || credenciais.senha,
+        token,
+    };
 }
 
 export async function loginUsuario(credenciais) {
@@ -30,9 +43,18 @@ export async function loginUsuario(credenciais) {
 
     const token = extrairToken(dados);
 
-    if (token) {
-        salvarToken(token);
+    if (!token) {
+        throw new Error("Login realizado, mas a API nao retornou token.");
     }
 
-    return dados;
+    const usuario = montarUsuario(dados, credenciais, token);
+
+    salvarToken(token);
+    await salvarUsuario(usuario);
+
+    return {
+        ...dados,
+        usuario,
+        token,
+    };
 }

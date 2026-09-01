@@ -1,9 +1,12 @@
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import {Alert, Pressable, ScrollView, StyleSheet, Text, View} from "react-native";
+import {buscarTokenUsuario} from "../services/Usuarios/usuarioStorage";
 
 import BotaoCadastro from "../components/BotaoCadastro";
 import CampoCadastro from "../components/CampoCadastro";
 import {loginUsuario} from "../services/Auth/loginUsuario";
+import {getBiometria} from "../services/Auth/biometria";
+import {salvarToken} from "../services/Auth/sessao";
 
 export default function Login({navigation}) {
     const [email, setEmail] = useState("");
@@ -11,7 +14,27 @@ export default function Login({navigation}) {
     const [carregando, setCarregando] = useState(false);
     const [mensagemErro, setMensagemErro] = useState("");
 
-    async function enviarLogin() {
+    useEffect(() => {
+        const cancelarEscuta = navigation.addListener("focus", async function () {
+            const token = await buscarTokenUsuario();
+            const estaLogado = Boolean(token);
+
+            console.log("login", estaLogado);
+
+            if (token) {
+                const bio = await getBiometria();
+
+                if (bio) {
+                    salvarToken(token);
+                    navigation.navigate("Home");
+                }
+            }
+        });
+
+        return cancelarEscuta;
+    }, [navigation]);
+
+    async function entrar() {
         const emailTratado = email.trim().toLowerCase();
 
         if (!emailTratado || !senha) {
@@ -28,15 +51,18 @@ export default function Login({navigation}) {
                 senha,
             });
 
-            if (!dados.token && !dados.accessToken && !dados.access_token && !dados.jwt && !dados.usuario?.token) {
+            const token = dados.usuario?.token || dados.token;
+
+            if (!token) {
                 setMensagemErro("Login realizado, mas a API nao retornou token.");
                 return;
             }
 
+            salvarToken(token);
             Alert.alert("Login realizado", "Voce entrou na sua conta.");
             navigation.navigate("Home");
         } catch (erro) {
-            setMensagemErro(erro.message);
+            setMensagemErro(erro.message || "Nao foi possivel fazer login.");
         } finally {
             setCarregando(false);
         }
@@ -44,9 +70,6 @@ export default function Login({navigation}) {
 
     return (
         <ScrollView contentContainerStyle={styles.conteudo} keyboardShouldPersistTaps="handled">
-            <Pressable style={styles.voltar} onPress={() => navigation.goBack()}>
-                <Text style={styles.voltarTexto}>Voltar</Text>
-            </Pressable>
 
             <View style={styles.cabecalho}>
                 <Text style={styles.titulo}>Entrar</Text>
@@ -76,7 +99,7 @@ export default function Login({navigation}) {
 
                 {mensagemErro ? <Text style={styles.erro}>{mensagemErro}</Text> : null}
 
-                <BotaoCadastro onPress={enviarLogin} carregando={carregando}>
+                <BotaoCadastro onPress={entrar} carregando={carregando}>
                     Entrar
                 </BotaoCadastro>
 

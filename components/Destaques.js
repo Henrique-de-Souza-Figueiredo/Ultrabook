@@ -1,7 +1,7 @@
 import { ScrollView, View, StyleSheet, Text } from "react-native";
 import CardLivro from "../components/CardLivro";
 
-export default function Destaques({ livros }) {
+export default function Destaques({ livros, logado = false, onExcluirLivro }) {
     return (
         <View style={styles.containerPrincipal}>
             <Text style={styles.destaque}>
@@ -12,8 +12,10 @@ export default function Destaques({ livros }) {
                 <View style={styles.lista}>
                     {livros.map((livro) => (
                         <CardLivro
-                            key={livro.id}
+                            key={livro.id || livro._id}
                             livro={livro}
+                            logado={logado}
+                            onExcluir={onExcluirLivro}
                         />
                     ))}
                 </View>

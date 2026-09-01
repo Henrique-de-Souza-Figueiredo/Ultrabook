@@ -53,9 +53,6 @@ export default function Cadastro({navigation}) {
 
     return (
             <ScrollView contentContainerStyle={styles.conteudo}>
-                <Pressable style={styles.voltar} onPress={() => navigation.goBack()}>
-                    <Text style={styles.voltarTexto}>Voltar</Text>
-                </Pressable>
 
                 <View style={styles.cabecalho}>
                     <Text style={styles.titulo}>Criar cadastro</Text>

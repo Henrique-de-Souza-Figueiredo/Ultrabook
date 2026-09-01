@@ -1,15 +1,58 @@
 import {useState} from "react";
-import {Pressable, ScrollView, StyleSheet, Text, View} from "react-native";
+import {Alert, Pressable, ScrollView, StyleSheet, Text, View} from "react-native";
 
 import BotaoCadastro from "../components/BotaoCadastro";
 import CampoCadastro from "../components/CampoCadastro";
+import {cadastrarLivro, editarLivro} from "../services/Livros/salvarLivro";
 
-export default function AdicionarLivro({navigation}) {
-    const [titulo, setTitulo] = useState("");
-    const [autor, setAutor] = useState("");
-    const [categoria, setCategoria] = useState("");
-    const [faixaEtaria, setFaixaEtaria] = useState("");
-    const [descricao, setDescricao] = useState("");
+export default function AdicionarLivro({navigation, route}) {
+    const livroEdicao = route?.params?.livro || null;
+    const editando = Boolean(livroEdicao);
+    const livroId = livroEdicao?.id || livroEdicao?._id;
+
+    const [titulo, setTitulo] = useState(livroEdicao?.titulo || "");
+    const [autor, setAutor] = useState(livroEdicao?.autor || "");
+    const [categoria, setCategoria] = useState(livroEdicao?.categoria || "");
+    const [faixaEtaria, setFaixaEtaria] = useState(livroEdicao?.faixa_etaria || livroEdicao?.faixaEtaria || "");
+    const [imagem, setImagem] = useState(livroEdicao?.imagem || "");
+    const [descricao, setDescricao] = useState(livroEdicao?.descricao || "");
+    const [carregando, setCarregando] = useState(false);
+    const [mensagemErro, setMensagemErro] = useState("");
+
+    async function salvar() {
+        const livro = {
+            titulo: titulo.trim(),
+            autor: autor.trim(),
+            categoria: categoria.trim(),
+            faixa_etaria: faixaEtaria.trim(),
+            imagem: imagem.trim(),
+            descricao: descricao.trim(),
+        };
+
+        if (!livro.titulo || !livro.autor || !livro.categoria || !livro.faixa_etaria || !livro.imagem || !livro.descricao) {
+            setMensagemErro("Preencha todos os campos.");
+            return;
+        }
+
+        setCarregando(true);
+        setMensagemErro("");
+
+        try {
+            if (editando) {
+                await editarLivro(livroId, livro);
+                Alert.alert("Livro editado", "As informacoes do livro foram atualizadas.");
+            } else {
+                await cadastrarLivro(livro);
+                Alert.alert("Livro cadastrado", "O livro foi adicionado com sucesso.");
+            }
+
+            navigation.navigate("Home");
+        } catch (erro) {
+            setMensagemErro(erro.message || "Nao foi possivel salvar o livro.");
+        } finally {
+            setCarregando(false);
+        }
+    }
 
     return (
         <ScrollView contentContainerStyle={styles.conteudo} keyboardShouldPersistTaps="handled">
@@ -18,7 +61,7 @@ export default function AdicionarLivro({navigation}) {
             </Pressable>
 
             <View style={styles.cabecalho}>
-                <Text style={styles.tituloPagina}>Adicionar livro</Text>
+                <Text style={styles.tituloPagina}>{editando ? "Editar livro" : "Adicionar livro"}</Text>
                 <Text style={styles.subtitulo}>Preencha as informacoes do livro.</Text>
             </View>
 
@@ -52,6 +95,16 @@ export default function AdicionarLivro({navigation}) {
                 />
 
                 <CampoCadastro
+                    label="Imagem"
+                    value={imagem}
+                    onChangeText={setImagem}
+                    placeholder="Cole o link da imagem"
+                    keyboardType="url"
+                    autoCapitalize="none"
+                    textContentType="URL"
+                />
+
+                <CampoCadastro
                     label="Descricao"
                     value={descricao}
                     onChangeText={setDescricao}
@@ -60,8 +113,10 @@ export default function AdicionarLivro({navigation}) {
                     numberOfLines={5}
                 />
 
-                <BotaoCadastro onPress={() => {}}>
-                    Adicionar livro
+                {mensagemErro ? <Text style={styles.erro}>{mensagemErro}</Text> : null}
+
+                <BotaoCadastro onPress={salvar} carregando={carregando}>
+                    {editando ? "Salvar alteracoes" : "Adicionar livro"}
                 </BotaoCadastro>
             </View>
         </ScrollView>
@@ -111,5 +166,13 @@ const styles = StyleSheet.create({
 
     formulario: {
         width: "100%",
+    },
+
+    erro: {
+        marginTop: 2,
+        marginBottom: 8,
+        color: "#ca0909",
+        fontSize: 14,
+        fontWeight: "600",
     },
 });

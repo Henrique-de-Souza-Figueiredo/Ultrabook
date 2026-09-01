@@ -1,4 +1,4 @@
-import { Pressable, Text, View, StyleSheet } from "react-native";
+import { Alert, Pressable, Text, View, StyleSheet } from "react-native";
 import { useCallback, useEffect, useState } from "react";
 import {useFocusEffect} from "@react-navigation/native";
 
@@ -8,7 +8,11 @@ import Destaques from "../components/Destaques";
 import BarraPesquisa from "../components/BarraPesquisa";
 import { buscarCategorias } from "../services/Categorias/buscarCategorias";
 import Categorias from "../components/Categorias";
-import {usuarioEstaLogado} from "../services/Auth/sessao";
+import {removerToken, usuarioEstaLogado} from "../services/Auth/sessao";
+import {buscarUsuario, removerUsuario} from "../services/Usuarios/usuarioStorage";
+import {excluirLivro} from "../services/Livros/salvarLivro";
+import {excluirUsuario} from "../services/Usuarios/usuarioApi";
+import {getBiometria} from "../services/Auth/biometria";
 
 export default function Home({navigation}) {
     const [livros, setLivros] = useState([]);
@@ -16,9 +20,15 @@ export default function Home({navigation}) {
     const [categoriaSelecionada, setCategoriaSelecionada] = useState(null);
     const [busca, setBusca] = useState("");
     const [logado, setLogado] = useState(usuarioEstaLogado());
+    const [usuario, setUsuario] = useState(null);
+    const nomeUsuario = usuario?.nome || usuario?.name || "";
+
+    function carregarLivros() {
+        buscarLivros(setLivros);
+    }
 
     useEffect(() => {
-        buscarLivros(setLivros);
+        carregarLivros();
     }, []);
 
     useEffect(() => {
@@ -26,8 +36,83 @@ export default function Home({navigation}) {
     }, []);
 
     useFocusEffect(useCallback(() => {
-        setLogado(usuarioEstaLogado());
+        async function atualizarTela() {
+            const usuarioSalvo = await buscarUsuario();
+
+            setUsuario(usuarioSalvo);
+            setLogado(usuarioEstaLogado());
+            carregarLivros();
+        }
+
+        atualizarTela();
     }, []));
+
+    function confirmarExclusao(livro) {
+        const livroId = livro.id || livro._id;
+
+        Alert.alert(
+            "Excluir livro",
+            `Deseja excluir "${livro.titulo}"?`,
+            [
+                {text: "Cancelar", style: "cancel"},
+                {
+                    text: "Excluir",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            await excluirLivro(livroId);
+                            carregarLivros();
+                        } catch (erro) {
+                            Alert.alert("Erro", erro.message || "Nao foi possivel excluir o livro.");
+                        }
+                    },
+                },
+            ],
+        );
+    }
+
+    async function sair() {
+        removerToken();
+        setLogado(false);
+        navigation.navigate("Login");
+    }
+
+    function confirmarExclusaoConta() {
+        const usuarioId = usuario?.id || usuario?._id;
+
+        if (!usuarioId) {
+            Alert.alert("Erro", "Nao foi possivel identificar sua conta.");
+            return;
+        }
+
+        Alert.alert(
+            "Excluir conta",
+            "Deseja excluir sua conta?",
+            [
+                {text: "Cancelar", style: "cancel"},
+                {
+                    text: "Excluir",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            const biometriaConfirmada = await getBiometria();
+
+                            if (!biometriaConfirmada) {
+                                Alert.alert("Verificacao necessaria", "Confirme sua identidade para excluir a conta.");
+                                return;
+                            }
+
+                            await excluirUsuario(usuarioId);
+                            await removerUsuario();
+                            await sair();
+                        } catch (erro) {
+                            Alert.alert("Erro", erro.message || "Nao foi possivel excluir a conta.");
+                        }
+                    },
+                },
+            ],
+        );
+    }
 
     const textoBusca = busca.trim().toLowerCase();
 
@@ -42,7 +127,7 @@ export default function Home({navigation}) {
                 livro.autor,
                 livro.categoria,
                 livro.descricao,
-            ].some((campo) => campo.toLowerCase().includes(textoBusca))
+            ].some((campo) => String(campo || "").toLowerCase().includes(textoBusca))
             : true;
 
         return correspondeCategoria && correspondeBusca;
@@ -50,12 +135,20 @@ export default function Home({navigation}) {
 
     return (
         <View style={styles.container}>
-            <Header />
+            <Header
+                logado={logado}
+                onSair={sair}
+                onExcluirConta={confirmarExclusaoConta}
+            />
 
             {logado ? (
-                <Pressable style={styles.botaoAdicionar} onPress={() => navigation.navigate("AdicionarLivro")}>
-                    <Text style={styles.botaoAdicionarTexto}>Adicionar livro</Text>
-                </Pressable>
+                <>
+                    <Text style={styles.saudacao}>Olá, {nomeUsuario}</Text>
+
+                    <Pressable style={styles.botaoAdicionar} onPress={() => navigation.navigate("AdicionarLivro")}>
+                        <Text style={styles.botaoAdicionarTexto}>Adicionar livro</Text>
+                    </Pressable>
+                </>
             ) : null}
 
             <BarraPesquisa busca={busca} setBusca={setBusca} />
@@ -66,7 +159,11 @@ export default function Home({navigation}) {
                 setCategoriaSelecionada={setCategoriaSelecionada}
             />
 
-            <Destaques livros={livrosFiltrados} />
+            <Destaques
+                livros={livrosFiltrados}
+                logado={logado}
+                onExcluirLivro={confirmarExclusao}
+            />
         </View>
     );
 }
@@ -90,5 +187,13 @@ const styles = StyleSheet.create({
         color: "#fff",
         fontSize: 15,
         fontWeight: "bold",
+    },
+
+    saudacao: {
+        marginHorizontal: 15,
+        marginTop: 12,
+        fontSize: 17,
+        fontWeight: "bold",
+        color: "#222",
     },
 });
